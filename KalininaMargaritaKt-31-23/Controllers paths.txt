@@ -1,0 +1,197 @@
+Controllers/ApiBaseController.cs
+------------------------------------------------------------
+﻿using KalininaMargaritaKt_31_23.Dto;
+using Microsoft.AspNetCore.Mvc;
+
+namespace KalininaMargaritaKt_31_23.Controllers
+{
+    public abstract class ApiBaseController : ControllerBase
+    {
+        protected IActionResult ToResult<T>(ServiceResult<T> result)
+        {
+            return result.Status switch
+            {
+                ServiceStatus.Ok => Ok(result.Data),
+                ServiceStatus.NotFound => NotFound(new { error = result.Message }),
+                _ => BadRequest(new { error = result.Message })
+            };
+        }
+    }
+}
+------------------------------------------------------------
+Controllers/DisciplinesController.cs
+------------------------------------------------------------
+﻿using KalininaMargaritaKt_31_23.Dto;
+using KalininaMargaritaKt_31_23.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace KalininaMargaritaKt_31_23.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class DisciplinesController : ApiBaseController
+    {
+        private readonly IDisciplineService _disciplineService;
+
+        public DisciplinesController(IDisciplineService disciplineService) => _disciplineService = disciplineService;
+
+        [HttpPost("По названию дисциплины получить список фамилий студентов, у которых по этой дисциплине есть двойки")]
+        public async Task<IActionResult> GetLastNamesStudentsWith2GradesByDisciplineName([FromBody] DisciplineHas2GradeStudentFilter filter, CancellationToken ct) =>
+            Ok(await _disciplineService.GetLastNamesStudentsWith2GradesByDisciplineNameAsync(filter, ct));
+
+
+        [HttpPost("Получить данные дисциплины")]
+        public async Task<IActionResult> GetDisciplines([FromBody] DisciplineFilter filter, CancellationToken ct) =>
+            Ok(await _disciplineService.GetDisciplinesAsync(filter, ct));
+
+        [HttpPost("Добавить дисциплину")]
+        public async Task<IActionResult> AddDiscipline([FromBody] DisciplineRequest request, CancellationToken ct) =>
+            ToResult(await _disciplineService.AddDisciplineAsync(request, ct));
+
+        [HttpPut("Изменить дисциплину по id/{disciplineId:int}")]
+        public async Task<IActionResult> UpdateDiscipline(int disciplineId, [FromBody] DisciplineRequest request, CancellationToken ct) =>
+            ToResult(await _disciplineService.UpdateDisciplineAsync(disciplineId, request, ct));
+
+        [HttpDelete("Удалить дисциплину по id/{disciplineId:int}")]
+        public async Task<IActionResult> DeleteDiscipline(int disciplineId, CancellationToken ct) =>
+            ToResult(await _disciplineService.DeleteDisciplineAsync(disciplineId, ct));
+    }
+}
+------------------------------------------------------------
+Controllers/GradesController.cs
+------------------------------------------------------------
+﻿using KalininaMargaritaKt_31_23.Dto;
+using KalininaMargaritaKt_31_23.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace KalininaMargaritaKt_31_23.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class GradesController : ApiBaseController
+    {
+        private readonly IGradeService _gradeService;
+
+        public GradesController(IGradeService gradeService) => _gradeService = gradeService;
+
+
+        [HttpPost("Средний балл по предмету в группе")]
+        public async Task<IActionResult> GetGroupDisciplineAverage([FromBody] GroupDisciplineAverageFilter filter, CancellationToken ct) =>
+            ToResult(await _gradeService.GetGroupDisciplineAverageAsync(filter, ct));
+
+        [HttpPost("Оценки студента")]
+        public async Task<IActionResult> GetStudentGrades([FromBody] StudentGradesFilter filter, CancellationToken ct) =>
+            ToResult(await _gradeService.GetStudentGradesAsync(filter, ct));
+
+        [HttpPost("Средний балл по курсу")]
+        public async Task<IActionResult> GetYearAverage([FromBody] YearAverageFilter filter, CancellationToken ct) =>
+            ToResult(await _gradeService.GetYearAverageAsync(filter, ct));
+
+        [HttpPost("Добавить оценку")]
+        public async Task<IActionResult> AddGrade([FromBody] AddGradeRequest request, CancellationToken ct) =>
+            ToResult(await _gradeService.AddGradeAsync(request, ct));
+
+        [HttpPut("Изменить оценку по id/{gradeId:int}")]
+        public async Task<IActionResult> UpdateGrade(int gradeId, [FromBody] UpdateGradeRequest request, CancellationToken ct) =>
+            ToResult(await _gradeService.UpdateGradeAsync(gradeId, request, ct));
+    }
+}
+------------------------------------------------------------
+Controllers/GroupsController.cs
+------------------------------------------------------------
+﻿using KalininaMargaritaKt_31_23.Dto;
+using KalininaMargaritaKt_31_23.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace KalininaMargaritaKt_31_23.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class GroupsController : ApiBaseController
+    {
+        private readonly IGroupService _groupService;
+
+        public GroupsController(IGroupService groupService) => _groupService = groupService;
+
+        [HttpPost("Получить данные группы")]
+        public async Task<IActionResult> GetGroups([FromBody] GroupFilter filter, CancellationToken ct) =>
+            Ok(await _groupService.GetGroupsAsync(filter, ct));
+
+        [HttpPost("Добавить группу")]
+        public async Task<IActionResult> AddGroup([FromBody] GroupRequest request, CancellationToken ct) =>
+            ToResult(await _groupService.AddGroupAsync(request, ct));
+
+        [HttpPut("Изменить группу по id/{groupId:int}")]
+        public async Task<IActionResult> UpdateGroup(int groupId, [FromBody] GroupRequest request, CancellationToken ct) =>
+            ToResult(await _groupService.UpdateGroupAsync(groupId, request, ct));
+
+        [HttpDelete("Удалить группу по id/{groupId:int}")]
+        public async Task<IActionResult> DeleteGroup(int groupId, CancellationToken ct) =>
+            ToResult(await _groupService.DeleteGroupAsync(groupId, ct));
+    }
+}
+------------------------------------------------------------
+Controllers/SpecialtysController.cs
+------------------------------------------------------------
+﻿using KalininaMargaritaKt_31_23.Dto;
+using KalininaMargaritaKt_31_23.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace KalininaMargaritaKt_31_23.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class SpecialtiesController : ApiBaseController
+    {
+        private readonly ISpecialtyService _specialtyService;
+
+        public SpecialtiesController(ISpecialtyService specialtyService) => _specialtyService = specialtyService;
+
+        [HttpPost("Получить данные специальности")]
+        public async Task<IActionResult> GetSpecialties([FromBody] SpecialtyFilter filter, CancellationToken ct) =>
+            Ok(await _specialtyService.GetSpecialtiesAsync(filter, ct));
+
+        [HttpPost("Добавить специальность")]
+        public async Task<IActionResult> AddSpecialty([FromBody] SpecialtyRequest request, CancellationToken ct) =>
+            ToResult(await _specialtyService.AddSpecialtyAsync(request, ct));
+
+        [HttpPut("Изменить специальность по id/{specialtyId:int}")]
+        public async Task<IActionResult> UpdateSpecialty(int specialtyId, [FromBody] SpecialtyRequest request, CancellationToken ct) =>
+            ToResult(await _specialtyService.UpdateSpecialtyAsync(specialtyId, request, ct));
+    }
+}
+------------------------------------------------------------
+Controllers/StudentsController.cs
+------------------------------------------------------------
+﻿using KalininaMargaritaKt_31_23.Dto;
+using KalininaMargaritaKt_31_23.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace KalininaMargaritaKt_31_23.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class StudentsController : ApiBaseController
+    {
+        private readonly IStudentService _studentService;
+
+        public StudentsController(IStudentService studentService) => _studentService = studentService;
+
+        [HttpPost("Получить данные студента")]
+        public async Task<IActionResult> GetStudents([FromBody] StudentFilter filter, CancellationToken ct) =>
+            Ok(await _studentService.GetStudentsAsync(filter, ct));
+
+        [HttpPost("Добавить студента")]
+        public async Task<IActionResult> AddStudent([FromBody] StudentRequest request, CancellationToken ct) =>
+            ToResult(await _studentService.AddStudentAsync(request, ct));
+
+        [HttpPut("Изменить студента по id/{studentId:int}")]
+        public async Task<IActionResult> UpdateStudent(int studentId, [FromBody] StudentRequest request, CancellationToken ct) =>
+            ToResult(await _studentService.UpdateStudentAsync(studentId, request, ct));
+
+        [HttpDelete("Удалить студента по id/{studentId:int}")]
+        public async Task<IActionResult> DeleteStudent(int studentId, CancellationToken ct) =>
+            ToResult(await _studentService.DeleteStudentAsync(studentId, ct));
+    }
+}
+------------------------------------------------------------

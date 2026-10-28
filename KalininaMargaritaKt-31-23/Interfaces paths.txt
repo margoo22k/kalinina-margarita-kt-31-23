@@ -1,0 +1,527 @@
+Interfaces/IDisciplineService.cs
+------------------------------------------------------------
+﻿using KalininaMargaritaKt_31_23.Database;
+using KalininaMargaritaKt_31_23.Dto;
+using KalininaMargaritaKt_31_23.Models;
+using Microsoft.EntityFrameworkCore;
+using NLog.Filters;
+using System.Linq.Expressions;
+
+namespace KalininaMargaritaKt_31_23.Interfaces
+{
+    public interface IDisciplineService
+    {
+        Task<ServiceResult<List<string>>> GetLastNamesStudentsWith2GradesByDisciplineNameAsync(DisciplineHas2GradeStudentFilter filter, CancellationToken ct = default);
+        Task<List<DisciplineDto>> GetDisciplinesAsync(DisciplineFilter filter, CancellationToken ct = default);
+        Task<ServiceResult<DisciplineDto>> AddDisciplineAsync(DisciplineRequest request, CancellationToken ct = default);
+        Task<ServiceResult<DisciplineDto>> UpdateDisciplineAsync(int disciplineId, DisciplineRequest request, CancellationToken ct = default);
+        Task<ServiceResult<bool>> DeleteDisciplineAsync(int disciplineId, CancellationToken ct = default);
+    }
+
+    public class DisciplineService : IDisciplineService
+    {
+        private static readonly Expression<Func<Discipline, DisciplineDto>> ToDto = d =>
+            new DisciplineDto(d.DisciplineId, d.Name, d.IsDeleted);
+
+        private readonly StudentDbContext _db;
+
+        public DisciplineService(StudentDbContext db)
+        {
+            _db = db;
+        }
+
+        public async Task<ServiceResult<List<string>>> GetLastNamesStudentsWith2GradesByDisciplineNameAsync(DisciplineHas2GradeStudentFilter filter, CancellationToken ct = default)
+        {
+            if (!await _db.Disciplines.AnyAsync(d => d.Name == filter.DisciplineName, ct))
+                return ServiceResult<List<string>>.NotFound("Дисциплина с таким именем не найдена");
+
+            var lastNames = await _db.Students.AsNoTracking()
+                .Where(s => s.Grades.Any(g => g.Value == 2 && g.Discipline.Name == filter.DisciplineName))
+                .Select(s => s.LastName)
+                .ToListAsync(ct);
+
+            return ServiceResult<List<string>>.Ok(lastNames);
+        }
+
+        public async Task<List<DisciplineDto>> GetDisciplinesAsync(DisciplineFilter filter, CancellationToken ct = default)
+        {
+            var query = _db.Disciplines.AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(filter.Name))
+            {
+                var name = filter.Name.Trim();
+                query = query.Where(d => d.Name!.Contains(name));
+            }
+
+            if (filter.IsDeleted.HasValue)
+                query = query.Where(d => d.IsDeleted == filter.IsDeleted.Value);
+
+            return await query.OrderBy(d => d.Name).Select(ToDto).ToListAsync(ct);
+        }
+
+        public async Task<ServiceResult<DisciplineDto>> AddDisciplineAsync(DisciplineRequest request, CancellationToken ct = default)
+        {
+            var error = await ValidateAsync(request, 0, ct);
+            if (error != null)
+                return ServiceResult<DisciplineDto>.Invalid(error);
+
+            var discipline = new Discipline
+            {
+                Name = request.Name!.Trim()
+            };
+
+            _db.Disciplines.Add(discipline);
+            await _db.SaveChangesAsync(ct);
+
+            return ServiceResult<DisciplineDto>.Ok(await GetDtoAsync(discipline.DisciplineId, ct));
+        }
+
+        public async Task<ServiceResult<DisciplineDto>> UpdateDisciplineAsync(int disciplineId, DisciplineRequest request, CancellationToken ct = default)
+        {
+            var discipline = await _db.Disciplines.FirstOrDefaultAsync(d => d.DisciplineId == disciplineId && !d.IsDeleted, ct);
+            if (discipline == null)
+                return ServiceResult<DisciplineDto>.NotFound("Дисциплина не найдена");
+
+            var error = await ValidateAsync(request, disciplineId, ct);
+            if (error != null)
+                return ServiceResult<DisciplineDto>.Invalid(error);
+
+            discipline.Name = request.Name!.Trim();
+            await _db.SaveChangesAsync(ct);
+
+            return ServiceResult<DisciplineDto>.Ok(await GetDtoAsync(disciplineId, ct));
+        }
+
+        public async Task<ServiceResult<bool>> DeleteDisciplineAsync(int disciplineId, CancellationToken ct = default)
+        {
+            var discipline = await _db.Disciplines.FirstOrDefaultAsync(d => d.DisciplineId == disciplineId && !d.IsDeleted, ct);
+            if (discipline == null)
+                return ServiceResult<bool>.NotFound("Дисциплина не найдена");
+
+            discipline.IsDeleted = true;
+            await _db.SaveChangesAsync(ct);
+
+            return ServiceResult<bool>.Ok(true);
+        }
+
+        private Task<DisciplineDto> GetDtoAsync(int disciplineId, CancellationToken ct)
+        {
+            return _db.Disciplines.AsNoTracking().Where(d => d.DisciplineId == disciplineId).Select(ToDto).FirstAsync(ct);
+        }
+
+        private async Task<string?> ValidateAsync(DisciplineRequest request, int currentDisciplineId, CancellationToken ct)
+        {
+            var name = request.Name?.Trim();
+
+            if (string.IsNullOrWhiteSpace(name))
+                return "Название дисциплины обязательно";
+            if (name.Length > 150)
+                return "Название дисциплины не должно быть длиннее 150 символов";
+            if (await _db.Disciplines.AnyAsync(d => d.Name == name && !d.IsDeleted && d.DisciplineId != currentDisciplineId, ct))
+                return "Дисциплина с таким названием уже существует";
+
+            return null;
+        }
+    }
+}
+------------------------------------------------------------
+Interfaces/IGradeService.cs
+------------------------------------------------------------
+﻿using KalininaMargaritaKt_31_23.Database;
+using KalininaMargaritaKt_31_23.Dto;
+using KalininaMargaritaKt_31_23.Models;
+using Microsoft.EntityFrameworkCore;
+using System.Linq;
+
+namespace KalininaMargaritaKt_31_23.Interfaces
+{
+    public interface IGradeService
+    {
+        
+        Task<ServiceResult<AverageGradeDto>> GetGroupDisciplineAverageAsync(GroupDisciplineAverageFilter filter, CancellationToken ct = default);
+        Task<ServiceResult<StudentGradesDto>> GetStudentGradesAsync(StudentGradesFilter filter, CancellationToken ct = default);
+        Task<ServiceResult<AverageGradeDto>> GetYearAverageAsync(YearAverageFilter filter, CancellationToken ct = default);
+        Task<ServiceResult<GradeDto>> AddGradeAsync(AddGradeRequest request, CancellationToken ct = default);
+        Task<ServiceResult<GradeDto>> UpdateGradeAsync(int gradeId, UpdateGradeRequest request, CancellationToken ct = default);
+    }
+
+    public class GradeService : IGradeService
+    {
+        private const int MinGrade = 2;
+        private const int MaxGrade = 5;
+        private readonly StudentDbContext _db;
+
+        public GradeService(StudentDbContext db) => _db = db;
+
+
+        
+
+
+        public async Task<ServiceResult<AverageGradeDto>> GetGroupDisciplineAverageAsync(GroupDisciplineAverageFilter filter, CancellationToken ct = default)
+        {
+            if (!await _db.Groups.AnyAsync(g => g.GroupId == filter.GroupId && !g.IsDeleted, ct))
+                return ServiceResult<AverageGradeDto>.NotFound("Группа не найдена");
+            if (!await _db.Disciplines.AnyAsync(d => d.DisciplineId == filter.DisciplineId && !d.IsDeleted, ct))
+                return ServiceResult<AverageGradeDto>.NotFound("Дисциплина не найдена");
+
+            var query = _db.Grades.AsNoTracking()
+                .Where(g => g.DisciplineId == filter.DisciplineId && g.Student!.GroupId == filter.GroupId && !g.Student!.IsDeleted);
+
+            return ServiceResult<AverageGradeDto>.Ok(await CalculateAverageAsync(query, ct));
+        }
+
+        public async Task<ServiceResult<StudentGradesDto>> GetStudentGradesAsync(StudentGradesFilter filter, CancellationToken ct = default)
+        {
+            var student = await _db.Students.AsNoTracking()
+                .Where(s => s.StudentId == filter.StudentId && !s.IsDeleted)
+                .Select(s => new { s.StudentId, s.FirstName, s.LastName })
+                .FirstOrDefaultAsync(ct);
+
+            if (student == null) return ServiceResult<StudentGradesDto>.NotFound("Студент не найден");
+
+            var query = _db.Grades.AsNoTracking().Where(g => g.StudentId == filter.StudentId && !g.Discipline!.IsDeleted);
+            if (filter.DisciplineId.HasValue) query = query.Where(g => g.DisciplineId == filter.DisciplineId.Value);
+
+            var grades = await query.OrderBy(g => g.Discipline!.Name).ThenBy(g => g.GradeId)
+                .Select(g => new GradeDto(g.GradeId, g.StudentId, g.DisciplineId, g.Discipline!.Name, g.Value)).ToListAsync(ct);
+
+            double? average = grades.Count == 0 ? null : Math.Round(grades.Average(g => g.Value), 2);
+            return ServiceResult<StudentGradesDto>.Ok(new StudentGradesDto(student.StudentId, $"{student.LastName} {student.FirstName}", average, grades));
+        }
+
+        public async Task<ServiceResult<AverageGradeDto>> GetYearAverageAsync(YearAverageFilter filter, CancellationToken ct = default)
+        {
+            if (filter.Course < 1 || filter.Course > 6) return ServiceResult<AverageGradeDto>.Invalid("Курс должен быть от 1 до 6");
+            if (filter.DisciplineId.HasValue && !await _db.Disciplines.AnyAsync(d => d.DisciplineId == filter.DisciplineId.Value && !d.IsDeleted, ct))
+                return ServiceResult<AverageGradeDto>.NotFound("Дисциплина не найдена");
+
+            var query = _db.Grades.AsNoTracking().Where(g => g.Student!.Group!.Course == filter.Course && !g.Student!.IsDeleted && !g.Student!.Group!.IsDeleted && !g.Discipline!.IsDeleted);
+            if (filter.DisciplineId.HasValue) query = query.Where(g => g.DisciplineId == filter.DisciplineId.Value);
+
+            return ServiceResult<AverageGradeDto>.Ok(await CalculateAverageAsync(query, ct));
+        }
+
+        public async Task<ServiceResult<GradeDto>> AddGradeAsync(AddGradeRequest request, CancellationToken ct = default)
+        {
+            if (request.Value < MinGrade || request.Value > MaxGrade) return ServiceResult<GradeDto>.Invalid($"Оценка должна быть от {MinGrade} до {MaxGrade}");
+            if (!await _db.Students.AnyAsync(s => s.StudentId == request.StudentId && !s.IsDeleted, ct)) return ServiceResult<GradeDto>.Invalid("Студент не найден");
+
+            var discipline = await _db.Disciplines.AsNoTracking().FirstOrDefaultAsync(d => d.DisciplineId == request.DisciplineId && !d.IsDeleted, ct);
+            if (discipline == null) return ServiceResult<GradeDto>.Invalid("Дисциплина не найдена");
+
+            var grade = new Grade { StudentId = request.StudentId, DisciplineId = request.DisciplineId, Value = request.Value };
+            _db.Grades.Add(grade);
+            await _db.SaveChangesAsync(ct);
+
+            return ServiceResult<GradeDto>.Ok(new GradeDto(grade.GradeId, grade.StudentId, grade.DisciplineId, discipline.Name, grade.Value));
+        }
+
+        public async Task<ServiceResult<GradeDto>> UpdateGradeAsync(int gradeId, UpdateGradeRequest request, CancellationToken ct = default)
+        {
+            var grade = await _db.Grades.Include(g => g.Discipline).Include(g => g.Student).FirstOrDefaultAsync(g => g.GradeId == gradeId, ct);
+            if (grade == null || grade.Student!.IsDeleted || grade.Discipline!.IsDeleted) return ServiceResult<GradeDto>.NotFound("Оценка не найдена");
+            if (request.Value < MinGrade || request.Value > MaxGrade) return ServiceResult<GradeDto>.Invalid($"Оценка должна быть от {MinGrade} до {MaxGrade}");
+
+            grade.Value = request.Value;
+            await _db.SaveChangesAsync(ct);
+            return ServiceResult<GradeDto>.Ok(new GradeDto(grade.GradeId, grade.StudentId, grade.DisciplineId, grade.Discipline!.Name, grade.Value));
+        }
+
+        private static async Task<AverageGradeDto> CalculateAverageAsync(IQueryable<Grade> query, CancellationToken ct)
+        {
+            var count = await query.CountAsync(ct);
+            var average = await query.AverageAsync(g => (double?)g.Value, ct);
+            return new AverageGradeDto(average.HasValue ? Math.Round(average.Value, 2) : null, count);
+        }
+    }
+}
+------------------------------------------------------------
+Interfaces/IGroupService.cs
+------------------------------------------------------------
+﻿using System.Linq.Expressions;
+using KalininaMargaritaKt_31_23.Database;
+using KalininaMargaritaKt_31_23.Dto;
+using KalininaMargaritaKt_31_23.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace KalininaMargaritaKt_31_23.Interfaces
+{
+    public interface IGroupService
+    {
+        Task<List<GroupDto>> GetGroupsAsync(GroupFilter filter, CancellationToken ct = default);
+        Task<ServiceResult<GroupDto>> AddGroupAsync(GroupRequest request, CancellationToken ct = default);
+        Task<ServiceResult<GroupDto>> UpdateGroupAsync(int groupId, GroupRequest request, CancellationToken ct = default);
+        Task<ServiceResult<bool>> DeleteGroupAsync(int groupId, CancellationToken ct = default);
+    }
+
+    public class GroupService : IGroupService
+    {
+        private static readonly Expression<Func<Group, GroupDto>> ToDto = g =>
+            new GroupDto(g.GroupId, g.Name, g.Course, g.SpecialtyId, g.Specialty!.Title, g.IsDeleted);
+
+        private readonly StudentDbContext _db;
+        public GroupService(StudentDbContext db) => _db = db;
+
+        public async Task<List<GroupDto>> GetGroupsAsync(GroupFilter filter, CancellationToken ct = default)
+        {
+            var query = _db.Groups.AsNoTracking();
+            if (filter.SpecialtyId.HasValue) query = query.Where(g => g.SpecialtyId == filter.SpecialtyId.Value);
+            if (filter.Course.HasValue) query = query.Where(g => g.Course == filter.Course.Value);
+            if (filter.IsDeleted.HasValue) query = query.Where(g => g.IsDeleted == filter.IsDeleted.Value);
+            return await query.OrderBy(g => g.Name).Select(ToDto).ToListAsync(ct);
+        }
+
+        public async Task<ServiceResult<GroupDto>> AddGroupAsync(GroupRequest request, CancellationToken ct = default)
+        {
+            var error = await ValidateAsync(request, 0, ct);
+            if (error != null) return ServiceResult<GroupDto>.Invalid(error);
+
+            var group = new Group { Name = request.Name!.Trim(), Course = request.Course, SpecialtyId = request.SpecialtyId };
+            _db.Groups.Add(group);
+            await _db.SaveChangesAsync(ct);
+            return ServiceResult<GroupDto>.Ok(await GetDtoAsync(group.GroupId, ct));
+        }
+
+        public async Task<ServiceResult<GroupDto>> UpdateGroupAsync(int groupId, GroupRequest request, CancellationToken ct = default)
+        {
+            var group = await _db.Groups.FirstOrDefaultAsync(g => g.GroupId == groupId && !g.IsDeleted, ct);
+            if (group == null) return ServiceResult<GroupDto>.NotFound("Группа не найдена");
+
+            var error = await ValidateAsync(request, groupId, ct);
+            if (error != null) return ServiceResult<GroupDto>.Invalid(error);
+
+            group.Name = request.Name!.Trim(); group.Course = request.Course; group.SpecialtyId = request.SpecialtyId;
+            await _db.SaveChangesAsync(ct);
+            return ServiceResult<GroupDto>.Ok(await GetDtoAsync(groupId, ct));
+        }
+
+        public async Task<ServiceResult<bool>> DeleteGroupAsync(int groupId, CancellationToken ct = default)
+        {
+            // ВАЖНО: Загружаем студентов через Include, чтобы пометить их как удаленных вместе с группой
+            var group = await _db.Groups.Include(g => g.Students).FirstOrDefaultAsync(g => g.GroupId == groupId && !g.IsDeleted, ct);
+            if (group == null) return ServiceResult<bool>.NotFound("Группа не найдена");
+
+            group.IsDeleted = true;
+            foreach (var student in group.Students) student.IsDeleted = true;
+
+            await _db.SaveChangesAsync(ct);
+            return ServiceResult<bool>.Ok(true);
+        }
+
+        private Task<GroupDto> GetDtoAsync(int groupId, CancellationToken ct) =>
+            _db.Groups.AsNoTracking().Where(g => g.GroupId == groupId).Select(ToDto).FirstAsync(ct);
+
+        private async Task<string?> ValidateAsync(GroupRequest request, int currentGroupId, CancellationToken ct)
+        {
+            var name = request.Name?.Trim();
+            if (string.IsNullOrWhiteSpace(name)) return "Название группы обязательно";
+            if (request.Course < 1 || request.Course > 6) return "Курс должен быть от 1 до 6";
+            if (!await _db.Specialtys.AnyAsync(s => s.SpecialtyId == request.SpecialtyId, ct)) return "Специальность не найдена";
+            if (await _db.Groups.AnyAsync(g => g.Name == name && !g.IsDeleted && g.GroupId != currentGroupId, ct)) return "Группа с таким названием уже существует";
+            return null;
+        }
+    }
+}
+------------------------------------------------------------
+Interfaces/ISpecialtyService.cs
+------------------------------------------------------------
+﻿using System.Linq.Expressions;
+using KalininaMargaritaKt_31_23.Database;
+using KalininaMargaritaKt_31_23.Dto;
+using KalininaMargaritaKt_31_23.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace KalininaMargaritaKt_31_23.Interfaces
+{
+    public interface ISpecialtyService
+    {
+        Task<List<SpecialtyDto>> GetSpecialtiesAsync(SpecialtyFilter filter, CancellationToken ct = default);
+        Task<ServiceResult<SpecialtyDto>> AddSpecialtyAsync(SpecialtyRequest request, CancellationToken ct = default);
+        Task<ServiceResult<SpecialtyDto>> UpdateSpecialtyAsync(int specialtyId, SpecialtyRequest request, CancellationToken ct = default);
+    }
+
+    public class SpecialtyService : ISpecialtyService
+    {
+        private static readonly Expression<Func<Specialty, SpecialtyDto>> ToDto = s =>
+            new SpecialtyDto(s.SpecialtyId, s.Title, s.Code);
+
+        private readonly StudentDbContext _db;
+
+        public SpecialtyService(StudentDbContext db)
+        {
+            _db = db;
+        }
+
+        public async Task<List<SpecialtyDto>> GetSpecialtiesAsync(SpecialtyFilter filter, CancellationToken ct = default)
+        {
+            var query = _db.Specialtys.AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(filter.Title))
+            {
+                var title = filter.Title.Trim();
+                query = query.Where(s => s.Title!.Contains(title));
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.Code))
+            {
+                var code = filter.Code.Trim();
+                query = query.Where(s => s.Code!.Contains(code));
+            }
+
+            return await query.OrderBy(s => s.Code).Select(ToDto).ToListAsync(ct);
+        }
+
+        public async Task<ServiceResult<SpecialtyDto>> AddSpecialtyAsync(SpecialtyRequest request, CancellationToken ct = default)
+        {
+            var error = await ValidateAsync(request, 0, ct);
+            if (error != null)
+                return ServiceResult<SpecialtyDto>.Invalid(error);
+
+            var specialty = new Specialty
+            {
+                Title = request.Title!.Trim(),
+                Code = request.Code!.Trim()
+            };
+
+            _db.Specialtys.Add(specialty);
+            await _db.SaveChangesAsync(ct);
+
+            return ServiceResult<SpecialtyDto>.Ok(await GetDtoAsync(specialty.SpecialtyId, ct));
+        }
+
+        public async Task<ServiceResult<SpecialtyDto>> UpdateSpecialtyAsync(int specialtyId, SpecialtyRequest request, CancellationToken ct = default)
+        {
+            var specialty = await _db.Specialtys.FirstOrDefaultAsync(s => s.SpecialtyId == specialtyId, ct);
+            if (specialty == null)
+                return ServiceResult<SpecialtyDto>.NotFound("Специальность не найдена");
+
+            var error = await ValidateAsync(request, specialtyId, ct);
+            if (error != null)
+                return ServiceResult<SpecialtyDto>.Invalid(error);
+
+            specialty.Title = request.Title!.Trim();
+            specialty.Code = request.Code!.Trim();
+            await _db.SaveChangesAsync(ct);
+
+            return ServiceResult<SpecialtyDto>.Ok(await GetDtoAsync(specialtyId, ct));
+        }
+
+        private Task<SpecialtyDto> GetDtoAsync(int specialtyId, CancellationToken ct)
+        {
+            return _db.Specialtys.AsNoTracking().Where(s => s.SpecialtyId == specialtyId).Select(ToDto).FirstAsync(ct);
+        }
+
+        private async Task<string?> ValidateAsync(SpecialtyRequest request, int currentSpecialtyId, CancellationToken ct)
+        {
+            var title = request.Title?.Trim();
+            var code = request.Code?.Trim();
+
+            if (string.IsNullOrWhiteSpace(title))
+                return "Название специальности обязательно";
+            if (string.IsNullOrWhiteSpace(code))
+                return "Код специальности обязателен";
+            if (title.Length > 150)
+                return "Название специальности не должно быть длиннее 150 символов";
+            if (code.Length > 20)
+                return "Код специальности не должен быть длиннее 20 символов";
+            if (await _db.Specialtys.AnyAsync(s => s.Code == code && s.SpecialtyId != currentSpecialtyId, ct))
+                return "Специальность с таким кодом уже существует";
+
+            return null;
+        }
+    }
+
+}
+------------------------------------------------------------
+Interfaces/IStudentService.cs
+------------------------------------------------------------
+﻿using System.Linq.Expressions;
+using KalininaMargaritaKt_31_23.Database;
+using KalininaMargaritaKt_31_23.Dto;
+using KalininaMargaritaKt_31_23.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace KalininaMargaritaKt_31_23.Interfaces
+{
+    public interface IStudentService
+    {
+        Task<List<StudentDto>> GetStudentsAsync(StudentFilter filter, CancellationToken ct = default);
+        Task<ServiceResult<StudentDto>> AddStudentAsync(StudentRequest request, CancellationToken ct = default);
+        Task<ServiceResult<StudentDto>> UpdateStudentAsync(int studentId, StudentRequest request, CancellationToken ct = default);
+        Task<ServiceResult<bool>> DeleteStudentAsync(int studentId, CancellationToken ct = default);
+    }
+
+    public class StudentService : IStudentService
+    {
+        private static readonly Expression<Func<Student, StudentDto>> ToDto = s =>
+            new StudentDto(s.StudentId, s.FirstName, s.LastName, s.GroupId, s.Group!.Name, s.IsDeleted);
+
+        private readonly StudentDbContext _db;
+        public StudentService(StudentDbContext db) => _db = db;
+
+        public async Task<List<StudentDto>> GetStudentsAsync(StudentFilter filter, CancellationToken ct = default)
+        {
+            var query = _db.Students.AsNoTracking();
+            if (!string.IsNullOrWhiteSpace(filter.GroupName)) query = query.Where(s => s.Group!.Name == filter.GroupName.Trim());
+
+            if (!string.IsNullOrWhiteSpace(filter.FullName))
+            {
+                var parts = filter.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (var part in parts)
+                {
+                    var p = part;
+                    query = query.Where(s => s.FirstName!.Contains(p) || s.LastName!.Contains(p));
+                }
+            }
+            if (filter.IsDeleted.HasValue) query = query.Where(s => s.IsDeleted == filter.IsDeleted.Value);
+
+            return await query.OrderBy(s => s.LastName).ThenBy(s => s.FirstName).Select(ToDto).ToListAsync(ct);
+        }
+
+        public async Task<ServiceResult<StudentDto>> AddStudentAsync(StudentRequest request, CancellationToken ct = default)
+        {
+            var error = await ValidateAsync(request, ct);
+            if (error != null) return ServiceResult<StudentDto>.Invalid(error);
+
+            var student = new Student { FirstName = request.FirstName!.Trim(), LastName = request.LastName!.Trim(), GroupId = request.GroupId };
+            _db.Students.Add(student);
+            await _db.SaveChangesAsync(ct);
+            return ServiceResult<StudentDto>.Ok(await GetDtoAsync(student.StudentId, ct));
+        }
+
+        public async Task<ServiceResult<StudentDto>> UpdateStudentAsync(int studentId, StudentRequest request, CancellationToken ct = default)
+        {
+            var student = await _db.Students.FirstOrDefaultAsync(s => s.StudentId == studentId && !s.IsDeleted, ct);
+            if (student == null) return ServiceResult<StudentDto>.NotFound("Студент не найден");
+
+            var error = await ValidateAsync(request, ct);
+            if (error != null) return ServiceResult<StudentDto>.Invalid(error);
+
+            student.FirstName = request.FirstName!.Trim(); student.LastName = request.LastName!.Trim(); student.GroupId = request.GroupId;
+            await _db.SaveChangesAsync(ct);
+            return ServiceResult<StudentDto>.Ok(await GetDtoAsync(studentId, ct));
+        }
+
+        public async Task<ServiceResult<bool>> DeleteStudentAsync(int studentId, CancellationToken ct = default)
+        {
+            var student = await _db.Students.FirstOrDefaultAsync(s => s.StudentId == studentId && !s.IsDeleted, ct);
+            if (student == null) return ServiceResult<bool>.NotFound("Студент не найден");
+
+            student.IsDeleted = true;
+            await _db.SaveChangesAsync(ct);
+            return ServiceResult<bool>.Ok(true);
+        }
+
+        private Task<StudentDto> GetDtoAsync(int studentId, CancellationToken ct) =>
+            _db.Students.AsNoTracking().Where(s => s.StudentId == studentId).Select(ToDto).FirstAsync(ct);
+
+        private async Task<string?> ValidateAsync(StudentRequest request, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(request.FirstName?.Trim())) return "Имя обязательно";
+            if (string.IsNullOrWhiteSpace(request.LastName?.Trim())) return "Фамилия обязательна";
+            if (!await _db.Groups.AnyAsync(g => g.GroupId == request.GroupId && !g.IsDeleted, ct)) return "Группа не найдена";
+            return null;
+        }
+    }
+}
+------------------------------------------------------------
