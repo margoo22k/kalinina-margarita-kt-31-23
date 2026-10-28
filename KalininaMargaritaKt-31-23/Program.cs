@@ -3,6 +3,7 @@ using KalininaMargaritaKt_31_23.ServiceExtensions;
 using Microsoft.EntityFrameworkCore;
 using NLog;
 using NLog.Web;
+using KalininaMargaritaKt_31_23.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,11 +28,13 @@ try
 
     var app = builder.Build();
 
+    app.UseMiddleware<ExceptionHandlerMiddleware>();
+
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
     { 
-    app.UseSwagger();
-    app.UseSwaggerUI();
+        app.UseSwagger();
+        app.UseSwaggerUI();
     }
 
     app.UseAuthorization();
