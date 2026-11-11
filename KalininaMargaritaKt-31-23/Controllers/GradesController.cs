@@ -13,12 +13,12 @@ namespace KalininaMargaritaKt_31_23.Controllers
         public GradesController(IGradeService gradeService) => _gradeService = gradeService;
 
 
-        [HttpPost("Получить данные оценок")]
-        public async Task<IActionResult> GetGradess([FromBody] CancellationToken ct) =>
-            Ok(await _gradeService.GetGradesAsync(ct));
+        [HttpGet("Получить данные оценок")]
+        public async Task<IActionResult> GetGradess(CancellationToken ct) =>
+            ToResult(await _gradeService.GetGradesAsync(ct));
 
-        [HttpPost("Средний балл по предмету в группе")]
-        public async Task<IActionResult> GetGroupDisciplineAverage([FromBody] GroupDisciplineAverageFilter filter, CancellationToken ct) =>
+        [HttpGet("Средний балл по предмету в группе")]
+        public async Task<IActionResult> GetGroupDisciplineAverage([FromQuery] GroupDisciplineAverageFilter filter, CancellationToken ct) =>
             ToResult(await _gradeService.GetGroupDisciplineAverageAsync(filter, ct));
 
         [HttpPost("Оценки студента")]

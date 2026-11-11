@@ -12,9 +12,9 @@ namespace KalininaMargaritaKt_31_23.Controllers
 
         public SpecialtiesController(ISpecialtyService specialtyService) => _specialtyService = specialtyService;
 
-        [HttpPost("Получить данные специальностей")]
-        public async Task<IActionResult> GetSpecialys([FromBody] CancellationToken ct) =>
-            Ok(await _specialtyService.GetSpecialtysAsync(ct));
+        [HttpGet("Получить данные специальностей")]
+        public async Task<IActionResult> GetSpecialys(CancellationToken ct) =>
+            ToResult(await _specialtyService.GetSpecialtysAsync(ct));
 
         [HttpPost("Добавить специальность")]
         public async Task<IActionResult> AddSpecialty([FromBody] SpecialtyRequest request, CancellationToken ct) =>

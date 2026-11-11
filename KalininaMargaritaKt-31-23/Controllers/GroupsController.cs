@@ -13,9 +13,9 @@ namespace KalininaMargaritaKt_31_23.Controllers
 
         public GroupsController(IGroupService groupService) => _groupService = groupService;
 
-        [HttpPost("Получить данные неудалённых групп")]
-        public async Task<IActionResult> GetGroups([FromBody] CancellationToken ct) =>
-            Ok(await _groupService.GetGroupsAsync(ct));
+        [HttpGet("Получить данные неудалённых групп")]
+        public async Task<IActionResult> GetGroups(CancellationToken ct) =>
+            ToResult(await _groupService.GetGroupsAsync(ct));
 
 
         [HttpPost("Добавить группу")]

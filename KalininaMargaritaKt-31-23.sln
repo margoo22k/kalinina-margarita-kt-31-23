@@ -5,6 +5,8 @@ VisualStudioVersion = 17.14.37710.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KalininaMargaritaKt-31-23", "KalininaMargaritaKt-31-23\KalininaMargaritaKt-31-23.csproj", "{A37E8EF3-902E-4CD8-9DD6-524E7E9F6729}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KalininaMargaritaKt_31_23.Tests", "KalininaMargaritaKt_31_23.Tests\KalininaMargaritaKt_31_23.Tests.csproj", "{284C39FD-BE12-4582-8F0E-E9859AC915AA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{A37E8EF3-902E-4CD8-9DD6-524E7E9F6729}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A37E8EF3-902E-4CD8-9DD6-524E7E9F6729}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A37E8EF3-902E-4CD8-9DD6-524E7E9F6729}.Release|Any CPU.Build.0 = Release|Any CPU
+		{284C39FD-BE12-4582-8F0E-E9859AC915AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{284C39FD-BE12-4582-8F0E-E9859AC915AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{284C39FD-BE12-4582-8F0E-E9859AC915AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{284C39FD-BE12-4582-8F0E-E9859AC915AA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

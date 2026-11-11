@@ -12,9 +12,9 @@ namespace KalininaMargaritaKt_31_23.Controllers
 
         public StudentsController(IStudentService studentService) => _studentService = studentService;
 
-        [HttpPost("Получить данные неудалённых студенов")]
-        public async Task<IActionResult> GetStudents([FromBody] CancellationToken ct) =>
-            Ok(await _studentService.GetStudentsAsync(ct));
+        [HttpGet("Получить данные неудалённых студенов")]
+        public async Task<IActionResult> GetStudents(CancellationToken ct) =>
+            ToResult(await _studentService.GetStudentsAsync(ct));
 
         [HttpPost("Добавить студента")]
         public async Task<IActionResult> AddStudent([FromBody] StudentRequest request, CancellationToken ct) =>

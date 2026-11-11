@@ -12,14 +12,14 @@ namespace KalininaMargaritaKt_31_23.Controllers
 
         public DisciplinesController(IDisciplineService disciplineService) => _disciplineService = disciplineService;
 
-        [HttpPost("По названию дисциплины получить список фамилий студентов, у которых по этой дисциплине есть двойки")]
-        public async Task<IActionResult> GetLastNamesStudentsWith2GradesByDisciplineName([FromBody] DisciplineHas2GradeStudentFilter filter, CancellationToken ct) =>
-            Ok(await _disciplineService.GetLastNamesStudentsWith2GradesByDisciplineNameAsync(filter, ct));
+        [HttpGet("По названию дисциплины получить список фамилий студентов, у которых по этой дисциплине есть двойки")]
+        public async Task<IActionResult> GetLastNamesStudentsWith2GradesByDisciplineName(
+        [FromQuery] DisciplineHas2GradeStudentFilter filter, CancellationToken ct) =>
+            ToResult(await _disciplineService.GetLastNamesStudentsWith2GradesByDisciplineNameAsync(filter, ct));
 
-
-        [HttpPost("Получить данные неудалённых дисциплин")]
-        public async Task<IActionResult> GetDisciplines([FromBody] CancellationToken ct) =>
-            Ok(await _disciplineService.GetDisciplinesAsync(ct));
+        [HttpGet("Получить данные неудалённых дисциплин")]
+        public async Task<IActionResult> GetDisciplines(CancellationToken ct) =>
+            ToResult(await _disciplineService.GetDisciplinesAsync(ct));
 
         [HttpPost("Добавить дисциплину")]
         public async Task<IActionResult> AddDiscipline([FromBody] DisciplineRequest request, CancellationToken ct) =>
